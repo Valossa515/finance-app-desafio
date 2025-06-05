@@ -8,6 +8,7 @@ const prisma = new PrismaClient()
 
 app.register(cors, {
   origin: ['http://localhost:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
 })
 
 app.get('/health', async () => {
@@ -15,19 +16,19 @@ app.get('/health', async () => {
 })
 
 const clientSchema = z.object({
-  name: z.string(),
+  name: z.string().min(100, 'Name must be at least 100 characters.'),
   email: z.string().email(),
   status: z.boolean().optional(),
 })
 
 app.post('/clients', async (request, reply) => {
-  const { name, email, status } = clientSchema.parse(request.body)
+  const { name, email, status = true } = clientSchema.parse(request.body)
   
   const client = await prisma.client.create({
     data: {
       name,
       email,
-      status: status ?? true,
+      status,
     },
   })
   
@@ -44,7 +45,7 @@ app.get('/clients', async () => {
 })
 
 app.get('/clients/:id', async (request, reply) => {
-  const { id } = request.params as { id: string }
+  const { id } = z.object({ id: z.string() }).parse(request.params)
   
   const client = await prisma.client.findUnique({
     where: { id: Number(id) },
@@ -61,35 +62,44 @@ app.get('/clients/:id', async (request, reply) => {
 })
 
 app.put('/clients/:id', async (request, reply) => {
-  const { id } = request.params as { id: string }
-  const { name, email, status } = clientSchema.parse(request.body)
-  
+  const { id } = z.object({ id: z.string() }).parse(request.params)
+  const numericId = Number(id)
+  if (isNaN(numericId)) {
+    return reply.status(400).send({ message: 'Invalid client id' })
+  }
+
+  const { name, email, status = true } = clientSchema.parse(request.body)
+
   try {
     const client = await prisma.client.update({
-      where: { id: Number(id) },
+      where: { id: numericId },
       data: {
         name,
         email,
         status,
       },
     })
-    
-    return client
+    return reply.status(200).send(client)
   } catch (error) {
+    console.error('Error updating client:', error)
     return reply.status(404).send({ message: 'Client not found' })
   }
 })
 
 app.delete('/clients/:id', async (request, reply) => {
-  const { id } = request.params as { id: string }
-  
+  const { id } = z.object({ id: z.string() }).parse(request.params)
+  const numericId = Number(id)
+  if (isNaN(numericId)) {
+    return reply.status(400).send({ message: 'Invalid client id' })
+  }
+
   try {
     await prisma.client.delete({
-      where: { id: Number(id) },
+      where: { id: numericId },
     })
-    
     return reply.status(204).send()
   } catch (error) {
+    console.error('Error deleting client:', error)
     return reply.status(404).send({ message: 'Client not found' })
   }
 })
@@ -114,7 +124,6 @@ app.post('/assets', async (request, reply) => {
   return reply.status(201).send(asset)
 })
 
-// List predefined assets (static data)
 app.get('/assets', async () => {
   return [
     { name: 'Ação XYZ', value: 150.75 },

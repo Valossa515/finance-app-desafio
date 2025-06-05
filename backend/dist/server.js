@@ -20,22 +20,23 @@ const app = (0, fastify_1.default)();
 const prisma = new client_1.PrismaClient();
 app.register(cors_1.default, {
     origin: ['http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
 });
 app.get('/health', () => __awaiter(void 0, void 0, void 0, function* () {
     return { status: 'ok' };
 }));
 const clientSchema = zod_1.z.object({
-    name: zod_1.z.string(),
+    name: zod_1.z.string().min(100, 'Name must be at least 100 characters.'),
     email: zod_1.z.string().email(),
     status: zod_1.z.boolean().optional(),
 });
 app.post('/clients', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, email, status } = clientSchema.parse(request.body);
+    const { name, email, status = true } = clientSchema.parse(request.body);
     const client = yield prisma.client.create({
         data: {
             name,
             email,
-            status: status !== null && status !== void 0 ? status : true,
+            status,
         },
     });
     return reply.status(201).send(client);
@@ -49,7 +50,7 @@ app.get('/clients', () => __awaiter(void 0, void 0, void 0, function* () {
     return clients;
 }));
 app.get('/clients/:id', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = request.params;
+    const { id } = zod_1.z.object({ id: zod_1.z.string() }).parse(request.params);
     const client = yield prisma.client.findUnique({
         where: { id: Number(id) },
         include: {
@@ -62,32 +63,42 @@ app.get('/clients/:id', (request, reply) => __awaiter(void 0, void 0, void 0, fu
     return client;
 }));
 app.put('/clients/:id', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = request.params;
-    const { name, email, status } = clientSchema.parse(request.body);
+    const { id } = zod_1.z.object({ id: zod_1.z.string() }).parse(request.params);
+    const numericId = Number(id);
+    if (isNaN(numericId)) {
+        return reply.status(400).send({ message: 'Invalid client id' });
+    }
+    const { name, email, status = true } = clientSchema.parse(request.body);
     try {
         const client = yield prisma.client.update({
-            where: { id: Number(id) },
+            where: { id: numericId },
             data: {
                 name,
                 email,
                 status,
             },
         });
-        return client;
+        return reply.status(200).send(client);
     }
     catch (error) {
+        console.error('Error updating client:', error);
         return reply.status(404).send({ message: 'Client not found' });
     }
 }));
 app.delete('/clients/:id', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = request.params;
+    const { id } = zod_1.z.object({ id: zod_1.z.string() }).parse(request.params);
+    const numericId = Number(id);
+    if (isNaN(numericId)) {
+        return reply.status(400).send({ message: 'Invalid client id' });
+    }
     try {
         yield prisma.client.delete({
-            where: { id: Number(id) },
+            where: { id: numericId },
         });
         return reply.status(204).send();
     }
     catch (error) {
+        console.error('Error deleting client:', error);
         return reply.status(404).send({ message: 'Client not found' });
     }
 }));
@@ -107,7 +118,6 @@ app.post('/assets', (request, reply) => __awaiter(void 0, void 0, void 0, functi
     });
     return reply.status(201).send(asset);
 }));
-// List predefined assets (static data)
 app.get('/assets', () => __awaiter(void 0, void 0, void 0, function* () {
     return [
         { name: 'Ação XYZ', value: 150.75 },

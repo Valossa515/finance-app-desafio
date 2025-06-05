@@ -18,12 +18,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 const clientSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  status: z.boolean().default(true),
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  email: z.string().email("Invalid email address."),
+  status: z.boolean(),
 })
 
 type Client = {
@@ -43,11 +46,31 @@ type Asset = {
 export default function ClientsPage() {
   const queryClient = useQueryClient()
   const [editingClient, setEditingClient] = useState<Client | null>(null)
-  
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(clientSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      status: true,
+    },
   })
-  
+
+  useEffect(() => {
+    if (editingClient) {
+      setValue('name', editingClient.name)
+      setValue('email', editingClient.email)
+      setValue('status', editingClient.status)
+    } else {
+      reset({
+        name: '',
+        email: '',
+        status: true,
+      })
+    }
+  }, [editingClient, setValue, reset])
+
+
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: async () => {
@@ -55,58 +78,91 @@ export default function ClientsPage() {
       return response.data
     },
   })
-  
+
   const createMutation = useMutation({
     mutationFn: (data: z.infer<typeof clientSchema>) => axios.post('http://localhost:3001/clients', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
-      reset()
+      reset({
+        name: '',
+        email: '',
+        status: true,
+      })
+      toast.success("Client created successfully!")
     },
+    onError: (error) => {
+      console.error("Error creating client:", error);
+      toast.error("Failed to create client.");
+    }
   })
-  
+
   const updateMutation = useMutation({
-    mutationFn: (data: { id: number; clientData: z.infer<typeof clientSchema> }) => 
+    mutationFn: (data: { id: number; clientData: z.infer<typeof clientSchema> }) =>
       axios.put(`http://localhost:3001/clients/${data.id}`, data.clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
-      reset()
       setEditingClient(null)
+      reset({
+        name: '',
+        email: '',
+        status: true,
+      })
+      toast.success("Client updated successfully!")
     },
+    onError: (error) => {
+      console.error("Error updating client:", error);
+      toast.error("Failed to update client.");
+    }
   })
-  
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axios.delete(`http://localhost:3001/clients/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
+      toast.success("Client deleted successfully!")
     },
+    onError: (error) => {
+      console.error("Error deleting client:", error);
+      toast.error("Failed to delete client.");
+    }
   })
 
   const onSubmit = (data: z.infer<typeof clientSchema>) => {
+    const clientDataToSend = {
+      ...data,
+      status: data.status,
+    };
+
     if (editingClient) {
-      updateMutation.mutate({ id: editingClient.id, clientData: data })
+      updateMutation.mutate({ id: editingClient.id, clientData: clientDataToSend });
     } else {
-      createMutation.mutate(data)
+      createMutation.mutate(clientDataToSend);
     }
   }
-  
+
   const handleEdit = (client: Client) => {
     setEditingClient(client)
-    reset({
-      name: client.name,
-      email: client.email,
-      status: client.status,
-    })
+    setValue('name', client.name)
+    setValue('email', client.email)
+    setValue('status', client.status)
   }
-  
+
   const handleCancel = () => {
     setEditingClient(null)
-    reset()
+    reset({
+      name: '',
+      email: '',
+      status: true,
+    })
   }
-  
+
   if (isLoading) return <div>Loading...</div>
-  
+
   return (
     <div className="space-y-8">
+      {}
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+
       <Card className="p-6">
         <h1 className="text-2xl font-bold mb-6">
           {editingClient ? 'Edit Client' : 'Add New Client'}
@@ -117,18 +173,23 @@ export default function ClientsPage() {
             <Input id="name" {...register('name')} />
             {errors.name && <p className="text-red-500">{errors.name.message as string}</p>}
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" {...register('email')} />
             {errors.email && <p className="text-red-500">{errors.email.message as string}</p>}
           </div>
-          
+
           <div className="flex items-center space-x-2">
-            <input type="checkbox" id="status" {...register('status')} className="w-4 h-4" />
+            <input
+              type="checkbox"
+              id="status"
+              {...register('status')}
+              className="w-4 h-4"
+            />
             <Label htmlFor="status">Active</Label>
           </div>
-          
+
           <div className="flex space-x-2">
             <Button type="submit">
               {editingClient ? 'Update' : 'Create'}
@@ -141,7 +202,7 @@ export default function ClientsPage() {
           </div>
         </form>
       </Card>
-      
+
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-4">Clients List</h2>
         <Table>
@@ -166,8 +227,8 @@ export default function ClientsPage() {
                   <Button size="sm" onClick={() => handleEdit(client)}>
                     Edit
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="destructive"
                     onClick={() => deleteMutation.mutate(client.id)}
                   >
