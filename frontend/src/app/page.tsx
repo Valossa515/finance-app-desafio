@@ -12,6 +12,9 @@ export default function Home() {
         <Button asChild>
           <Link href="/assets">Assets</Link>
         </Button>
+        <Button asChild>
+          <Link href="/assets-static">Static Assets</Link>
+        </Button>
       </div>
     </div>
   )

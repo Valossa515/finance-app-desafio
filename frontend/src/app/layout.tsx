@@ -23,6 +23,9 @@ export default function RootLayout({
               <Button variant="link" asChild>
                 <Link href="/assets">Assets</Link>
               </Button>
+              <Button variant="link" asChild>
+                <Link href="/assets-static">Static Assets</Link>
+              </Button>
             </div>
           </header>
           <main className="container mx-auto px-4 py-8">

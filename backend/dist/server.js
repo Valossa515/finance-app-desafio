@@ -116,6 +116,17 @@ const assetSchema = zod_1.z.object({
     value: zod_1.z.number(),
     clientId: zod_1.z.number(),
 });
+app.get('/clients/:id/assets', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = zod_1.z.object({ id: zod_1.z.string() }).parse(request.params);
+    const numericId = Number(id);
+    if (isNaN(numericId)) {
+        return reply.status(400).send({ message: 'ID do cliente inválido.' });
+    }
+    const clientAssets = yield prisma.asset.findMany({
+        where: { clientId: numericId },
+    });
+    return clientAssets;
+}));
 app.post('/assets', (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
     const { name, value, clientId } = assetSchema.parse(request.body);
     const asset = yield prisma.asset.create({
@@ -128,6 +139,14 @@ app.post('/assets', (request, reply) => __awaiter(void 0, void 0, void 0, functi
     return reply.status(201).send(asset);
 }));
 app.get('/assets', () => __awaiter(void 0, void 0, void 0, function* () {
+    const allAssets = yield prisma.asset.findMany({
+        include: {
+            client: true
+        }
+    });
+    return allAssets;
+}));
+app.get('/assets-static', () => __awaiter(void 0, void 0, void 0, function* () {
     return [
         { name: 'Ação XYZ', value: 150.75 },
         { name: 'Fundo ABC', value: 85.20 },

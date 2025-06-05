@@ -120,6 +120,21 @@ const assetSchema = z.object({
   clientId: z.number(),
 })
 
+app.get('/clients/:id/assets', async (request, reply) => {
+  const { id } = z.object({ id: z.string() }).parse(request.params)
+  const numericId = Number(id)
+
+  if (isNaN(numericId)) {
+    return reply.status(400).send({ message: 'ID do cliente inválido.' })
+  }
+
+  const clientAssets = await prisma.asset.findMany({
+    where: { clientId: numericId },
+  })
+
+  return clientAssets
+})
+
 app.post('/assets', async (request, reply) => {
   const { name, value, clientId } = assetSchema.parse(request.body)
   
@@ -135,6 +150,15 @@ app.post('/assets', async (request, reply) => {
 })
 
 app.get('/assets', async () => {
+    const allAssets = await prisma.asset.findMany({
+        include: {
+            client: true
+        }
+    });
+    return allAssets;
+});
+
+app.get('/assets-static', async () => {
   return [
     { name: 'Ação XYZ', value: 150.75 },
     { name: 'Fundo ABC', value: 85.20 },
