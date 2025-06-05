@@ -16,23 +16,33 @@ app.get('/health', async () => {
 })
 
 const clientSchema = z.object({
-  name: z.string().min(100, 'Name must be at least 100 characters.'),
+  name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email(),
   status: z.boolean().optional(),
 })
 
 app.post('/clients', async (request, reply) => {
-  const { name, email, status = true } = clientSchema.parse(request.body)
-  
-  const client = await prisma.client.create({
-    data: {
-      name,
-      email,
-      status,
-    },
-  })
-  
-  return reply.status(201).send(client)
+  try {
+    const { name, email, status = true } = clientSchema.parse(request.body)
+
+    const client = await prisma.client.create({
+      data: {
+        name,
+        email,
+        status,
+      },
+    })
+
+    return reply.status(201).send(client)
+  } catch (err) {
+    console.error('Validation or creation error:', err)
+
+    if (err instanceof z.ZodError) {
+      return reply.status(400).send({ message: 'Validation failed', errors: err.errors })
+    }
+
+    return reply.status(500).send({ message: 'Internal server error' })
+  }
 })
 
 app.get('/clients', async () => {
